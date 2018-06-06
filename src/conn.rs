@@ -185,19 +185,15 @@ pub trait Pullable {
     where A: IntoIterator<Item=Entid>;
 }
 
-pub trait Syncable {
-    fn sync(&mut self, server_uri: &String, user_uuid: &String) -> Result<()>;
-}
-
 /// Represents an in-progress, not yet committed, set of changes to the store.
 /// Call `commit` to commit your changes, or `rollback` to discard them.
 /// A transaction is held open until you do so.
 /// Your changes will be implicitly dropped along with this struct.
 pub struct InProgress<'a, 'c> {
-    transaction: rusqlite::Transaction<'c>,
+    pub(crate) transaction: rusqlite::Transaction<'c>,
     mutex: &'a Mutex<Metadata>,
     generation: u64,
-    partition_map: PartitionMap,
+    pub(crate) partition_map: PartitionMap,
     pub(crate) schema: Schema,
     pub(crate) cache: InProgressSQLiteAttributeCache,
     use_caching: bool,
@@ -408,6 +404,7 @@ impl<'a, 'c> InProgress<'a, 'c> {
     pub fn transact_builder(&mut self, builder: TermBuilder) -> Result<TxReport> {
         builder.build()
                .and_then(|(terms, _tempid_set)| {
+                   println!("build terms: {:?}", terms);
                     self.transact_entities(terms)
                })
     }
@@ -450,10 +447,14 @@ impl<'a, 'c> InProgress<'a, 'c> {
                      &self.schema,
                      w,
                      entities)?;
+            println!("transact_entities: done with transact(...)");
         self.partition_map = next_partition_map;
+        println!("transact_entities: pmap {:?}", self.partition_map);
         if let Some(schema) = next_schema {
             self.schema = schema;
+            println!("transact_entities: schema {:?}", self.schema);
         }
+        println!("transact_entities: report {:?}", report);
         Ok(report)
     }
 

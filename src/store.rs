@@ -14,10 +14,6 @@ use std::collections::{
     BTreeMap,
 };
 
-use std::path::{
-    Path,
-};
-
 use std::sync::{
     Arc,
 };
@@ -38,9 +34,6 @@ use mentat_db::{
     TxObserver,
 };
 
-#[cfg(feature = "syncable")]
-use mentat_tolstoy::Syncer;
-
 use conn::{
     CacheAction,
     CacheDirection,
@@ -49,11 +42,6 @@ use conn::{
     InProgressRead,
     Pullable,
     Queryable,
-};
-
-#[cfg(feature = "syncable")]
-use conn::{
-    Syncable,
 };
 
 use errors::*;
@@ -206,13 +194,14 @@ impl Pullable for Store {
 }
 
 #[cfg(feature = "syncable")]
-use uuid::Uuid;
+pub trait Syncable {
+    fn sync(&mut self, server_uri: &String, user_uuid: &String) -> Result<()>;
+}
 
 #[cfg(feature = "syncable")]
 impl Syncable for Store {
     fn sync(&mut self, server_uri: &String, user_uuid: &String) -> Result<()> {
-        let uuid = Uuid::parse_str(&user_uuid).map_err(|_| MentatError::BadUuid(user_uuid.clone()))?;
-        Ok(Syncer::flow(&mut self.sqlite, server_uri, &uuid)?)
+        self.conn.sync(&mut self.sqlite, server_uri, user_uuid)
     }
 }
 
@@ -222,10 +211,13 @@ mod tests {
 
     extern crate time;
 
+    use uuid::Uuid;
+
     use std::collections::{
         BTreeSet,
     };
     use std::path::{
+        Path,
         PathBuf,
     };
     use std::sync::mpsc;
@@ -235,8 +227,6 @@ mod tests {
     use std::time::{
         Duration,
     };
-
-    use uuid::Uuid;
 
     use mentat_db::cache::{
         SQLiteAttributeCache,
